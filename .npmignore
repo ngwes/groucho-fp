@@ -1,0 +1,39 @@
+# Ignore TypeScript source files
+src/
+*.ts
+*.tsx
+
+# Ignore test files
+test/
+tests/
+*.spec.ts
+*.test.ts
+coverage/
+
+# Ignore development files
+tsconfig.json
+tsconfig.*.json
+vitest.config.*
+jest.config.*
+.eslintrc*
+.prettierrc*
+*.md
+
+# Ignore node modules (npm ignora già automaticamente, ma aggiungerlo è OK)
+node_modules/
+
+# Ignore local environment files
+.env
+.env.*
+
+# Ignore build artifacts not meant for distribution
+*.log
+*.tsbuildinfo
+
+# Ignore editor/IDE specific files
+.vscode/
+.idea/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
