@@ -4,6 +4,7 @@
     "outDir": "./dist",
 
     "module": "ES2020",
+    "moduleResolution": "Bundler",
     "target": "ES2020",
     "types": [],
 
