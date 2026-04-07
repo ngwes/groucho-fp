@@ -169,6 +169,7 @@ result.match(
 - **Empty pipeline**: `createPipeline([], options).run(ctx)` → returns `Right(ctx)` without invoking any handler
 - **Handler that throws**: the exception propagates to the caller of `run`
 - **Handler that returns `Right`**: the value becomes the final result of `run` — the pipeline does not resume subsequent steps
+- **Context fields that steps will write must be initialised to `undefined`**: conflict detection treats any non-`undefined` value as already written by a previous step. A field initialised to `""`, `0`, `false`, or any other default in the constructor will be flagged as conflicting the first time a step tries to set it. Declare step-output fields as optional (`field?: Type`) with no default value.
 
 ---
 

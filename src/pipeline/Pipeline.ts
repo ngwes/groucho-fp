@@ -12,8 +12,10 @@ export async function Pipeline<E, Ctx extends object>(
     ctx: Ctx,
     steps: ReadonlyArray<Step<E, Ctx>>,
     options: PipelineOptions<E, Ctx>
-): Promise<Either<E, Readonly<Ctx>>> {
+): Promise<Either<E, Readonly<Ctx>>> 
+{
     let context = Object.freeze(ctx);
+
     try {
         for (const step of steps) {
             const resultEither = await step(context);
@@ -23,7 +25,7 @@ export async function Pipeline<E, Ctx extends object>(
 
             const result = resultEither.unwrapRight();
             const conflictingKeys = (Object.keys(result) as Array<keyof Ctx>)
-                .filter((k) => context[k] !== undefined && result[k] !== context[k]);
+                                    .filter((k) => context[k] !== undefined && result[k] !== context[k]);
 
             if (conflictingKeys.length !== 0)
                 return options.onConflictingKeys(conflictingKeys as string[], context);
