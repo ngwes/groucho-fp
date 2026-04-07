@@ -16,7 +16,9 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:filter": "vitest run -t",
     "test:debug": "vitest run --inspect-brk --no-file-parallelism",
+    "test:debug:filter": "vitest run --inspect-brk --no-file-parallelism -t",
     "prepare": "husky"
   },
   "devDependencies": {
