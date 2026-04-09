@@ -75,6 +75,28 @@ describe("Pipeline", () => {
         expect(result.isRight()).toBe(true);
         expect(result.unwrapRight().exceptionStepOutput).toBe("exception message");
     })
+
+    it("runs onException step when error with value coming from the first step", async () => {
+        const step2: Step<StepError, StepCtx> = (ctx: StepCtx) => {
+            throw new Error("exception message");
+        }
+
+        const step1: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
+            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: "first" }))
+        }
+
+        const context = new StepCtx("Hello world")
+        const options : PipelineOptions<StepError, StepCtx> = {
+            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, errorStepOutput: err.errorMessage})),
+            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, exceptionStepOutput: ctx.step1output})),
+            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
+        }
+
+        const result = await Pipeline(context, [step1, step2], options)
+
+        expect(result.isRight()).toBe(true);
+        expect(result.unwrapRight().exceptionStepOutput).toBe("first");
+    })
 });
 
 class StepError {
