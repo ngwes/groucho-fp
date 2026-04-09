@@ -13,10 +13,10 @@ export async function Pipeline<E, Ctx extends object>(
     steps: ReadonlyArray<Step<E, Ctx>>,
     options: PipelineOptions<E, Ctx>
 ): Promise<Either<E, Readonly<Ctx>>> {
-    let c = Either.right<E, Readonly<Ctx>>(Object.freeze(ctx));
+    let context = Either.right<E, Readonly<Ctx>>(Object.freeze(ctx));
     try {
         for (const step of steps) {
-             c = await c.bindAsync(async ctx => (await step(ctx))
+             context = await context.bindAsync(async ctx => (await step(ctx))
             .bindLeftAsync(err => options.onLeft(err, ctx))
             .bindAsync(_ => {
                 const keys = getConflictingKeys<Ctx>(_, ctx)
@@ -26,10 +26,10 @@ export async function Pipeline<E, Ctx extends object>(
         }
     }
     catch (err) {
-        return c.bindAsync(_ => options.onException(err, _));
+        return context.bindAsync(_ => options.onException(err, _));
     }
 
-    return c;
+    return context;
 }
 
 function getConflictingKeys<Ctx extends object>(result: Ctx, context: Readonly<Ctx>) {
