@@ -16,13 +16,14 @@ export async function Pipeline<E, Ctx extends object>(
     let context = Either.right<E, Readonly<Ctx>>(Object.freeze(ctx));
     try {
         for (const step of steps) {
-             context = await context.bindAsync(async ctx => (await step(ctx))
-            .bindLeftAsync(err => options.onLeft(err, ctx))
-            .bindAsync(_ => {
-                const keys = getConflictingKeys<Ctx>(_, ctx)
-                return keys.length > 0 ? options.onConflictingKeys(keys as string[], ctx) :
-                                         asTask(Either.right<E, Readonly<Ctx>>(Object.freeze(_)));
-            }))
+             context = await context
+             .bindAsync(async ctx => (await step(ctx))
+                                    .bindLeftAsync(err => options.onLeft(err, ctx))
+                                    .bindAsync(_ => {
+                                        const keys = getConflictingKeys<Ctx>(_, ctx)
+                                        return keys.length > 0 ? options.onConflictingKeys(keys as string[], ctx) :
+                                                                 asTask(Either.right<E, Readonly<Ctx>>(Object.freeze(_)));
+                                    }))
         }
     }
     catch (err) {
