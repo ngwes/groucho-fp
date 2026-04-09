@@ -1,4 +1,4 @@
-import { Either, EitherAsync, asTask } from "@ngwes/mini-fp";
+import { Either, asTask } from "@ngwes/mini-fp";
 
 export type Step<E, Ctx> = (ctx: Readonly<Ctx>) => Promise<Either<E, Ctx>>;
 
