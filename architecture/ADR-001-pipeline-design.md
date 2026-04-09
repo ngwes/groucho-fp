@@ -1,4 +1,4 @@
-# ADR-001: Pipeline con Railway Oriented Programming su mini-fp
+# ADR-001: Pipeline with Railway Oriented Programming on mini-fp
 
 **Status:** Accepted  
 **Date:** 2026-04-03  
@@ -8,25 +8,25 @@
 
 ## Context
 
-`groucho-fp` deve fornire un pattern pipeline per orchestrare funzioni asincrone che possono fallire. Le funzioni devono poter arricchire uno stato comune (context) in modo additivo. Al primo fallimento la pipeline si ferma e invoca un handler dedicato. La libreria si appoggia a `mini-fp` (`@ngwes/mini-fp`) per il tipo `Either<L, R>`.
+`groucho-fp` must provide a pipeline pattern for orchestrating asynchronous functions that can fail. Functions must be able to enrich a shared state (context) in an additive way. On the first failure the pipeline stops and invokes a dedicated handler. The library relies on `mini-fp` (`@ngwes/mini-fp`) for the `Either<L, R>` type.
 
 ---
 
 ## Decision
 
-Implementare una factory `createPipeline` che:
+Implement a `createPipeline` factory that:
 
-- accetta un array di **step** — funzioni `(ctx: Readonly<Ctx>) => Promise<Either<L, Ctx>>`
-- accetta un options object con tre handler: `onLeft`, `onException`, `onConflict`
-- restituisce un oggetto `Pipeline` con metodo `run(ctx: Ctx): Promise<Either<L, Readonly<Ctx>>>`
+- accepts an array of **steps** — functions `(ctx: Readonly<Ctx>) => Promise<Either<L, Ctx>>`
+- accepts an options object with three handlers: `onLeft`, `onException`, `onConflict`
+- returns a `Pipeline` object with method `run(ctx: Ctx): Promise<Either<L, Readonly<Ctx>>>`
 
-Tutti gli step hanno la stessa firma omogenea. Il context è l'unico stato condiviso: ogni step riceve il context corrente e restituisce un nuovo context arricchito. Gli step sono agnostici tra loro — conoscono solo `Ctx` e `L`, non si importano a vicenda.
+All steps share the same homogeneous signature. The context is the only shared state: each step receives the current context and returns an enriched new context. Steps are agnostic to each other — they only know `Ctx` and `L`, they do not import one another.
 
-I tre handler seguono tutti lo stesso pattern — ricevono informazioni sull'errore più il context al momento del fallimento, e restituiscono `Promise<Either<L, Ctx>>`. Possono quindi **recuperare** (restituendo `Right`) o propagare il fallimento (restituendo `Left`). Il loro valore di ritorno diventa il risultato di `run`.
+The three handlers all follow the same pattern — they receive information about the error plus the context at the moment of failure, and return `Promise<Either<L, Ctx>>`. They can therefore **recover** (by returning `Right`) or propagate the failure (by returning `Left`). Their return value becomes the result of `run`.
 
-**Il cleanup di risorse** (rollback, chiusura connessioni) va fatto negli handler — la pipeline non ha meccanismi di rollback autonomi.
+**Resource cleanup** (rollback, closing connections) should be done in the handlers — the pipeline has no autonomous rollback mechanism.
 
-### Tipi pubblici
+### Public types
 
 ```typescript
 type Step<L, Ctx> = (ctx: Readonly<Ctx>) => Promise<Either<L, Ctx>>;
@@ -47,15 +47,15 @@ function createPipeline<L, Ctx extends object>(
 ): Pipeline<L, Ctx>;
 ```
 
-### Flusso di esecuzione
+### Execution flow
 
 ```mermaid
 flowchart TD
     A([run ctx]) --> B[step N]
     B -->|Right newCtx| C{conflicting keys?}
     C -->|no| D[freeze + next step]
-    C -->|sì| E[onConflict keys, ctx]
-    D -->|steps esauriti| F([Right finalCtx])
+    C -->|yes| E[onConflict keys, ctx]
+    D -->|steps exhausted| F([Right finalCtx])
 
     B -->|Left err| G[onLeft err, ctx]
     B -->|throws| H[onException err, ctx]
@@ -68,7 +68,7 @@ flowchart TD
     H -->|Left err| I
 ```
 
-### Loop di esecuzione interno
+### Internal execution loop
 
 ```typescript
 async run(ctx: Ctx): Promise<Either<L, Readonly<Ctx>>> {
@@ -102,7 +102,7 @@ async run(ctx: Ctx): Promise<Either<L, Readonly<Ctx>>> {
 }
 ```
 
-### Esempio d'uso
+### Usage example
 
 ```typescript
 type AppError =
@@ -115,8 +115,8 @@ type AppContext = {
   mailer: Mailer;
   userId: string;
 
-  validatedId?: string;               // aggiunto da validateUserId
-  user?:        { id: string; email: string }; // aggiunto da fetchUser
+  validatedId?: string;               // added by validateUserId
+  user?:        { id: string; email: string }; // added by fetchUser
 };
 
 const pipeline = createPipeline<AppError, AppContext>(
@@ -129,7 +129,7 @@ const pipeline = createPipeline<AppError, AppContext>(
     onException: async (err, ctx) => {
       await ctx.db.rollback();
       console.error('Unexpected crash', err);
-      return Either.left({ tag: 'send_failed' }); // o un errore generico
+      return Either.left({ tag: 'send_failed' });
     },
     onConflict: async (keys, ctx) => {
       console.error('Conflict on keys:', keys);
@@ -152,30 +152,31 @@ result.match(
 
 ### Positive
 
-- Firma degli step **omogenea e agnostica**: ogni step conosce solo `Ctx` e `L`, non ha dipendenze dagli altri step
-- I tre handler seguono lo stesso pattern: `(errorInfo, ctx) => Promise<Either<L, Ctx>>` — possono recuperare (Right) o propagare (Left)
-- `run` restituisce `Either` → il chiamante reagisce programmaticamente senza accoppiamento ai side effect
-- `Object.freeze` + conflict detection garantiscono l'immutabilità delle scritture precedenti a runtime
+- **Homogeneous and agnostic step signature**: each step only knows `Ctx` and `L`, with no dependencies on other steps
+- The three handlers follow the same pattern: `(errorInfo, ctx) => Promise<Either<L, Ctx>>` — they can recover (Right) or propagate (Left)
+- `run` returns `Either` → the caller reacts programmatically without coupling to side effects
+- `Object.freeze` + conflict detection guarantee runtime immutability of previously written values
 
-### Negative / Trade-off
+### Negative / Trade-offs
 
-- `Ctx` deve dichiarare upfront tutti i campi possibili, alcuni opzionali — TypeScript non garantisce a compile-time che un campo opzionale sia presente quando lo step ne ha bisogno
-- La conflict detection è solo runtime — non c'è garanzia statica che uno step non sovrascriva un campo precedente
-- **`Object.freeze` è shallow**: oggetti annidati in `Ctx` restano mutabili in profondità
-- Il cleanup è responsabilità degli handler — la pipeline non ha rollback automatico
+- `Ctx` must declare all possible fields upfront, some optional — TypeScript cannot guarantee at compile time that an optional field is present when a step needs it
+- Conflict detection is runtime only — there is no static guarantee that a step will not overwrite a previous field
+- **`Object.freeze` is shallow**: nested objects inside `Ctx` remain mutable in depth
+- Cleanup is the handlers' responsibility — the pipeline has no automatic rollback
 
-### Edge case documentati
+### Documented edge cases
 
-- **Pipeline vuota**: `createPipeline([], options).run(ctx)` → restituisce `Right(ctx)` senza invocare handler
-- **Handler che lancia**: l'eccezione si propaga al chiamante di `run`
-- **Handler che restituisce `Right`**: il valore diventa il risultato finale di `run` — la pipeline non riprende gli step successivi
+- **Empty pipeline**: `createPipeline([], options).run(ctx)` → returns `Right(ctx)` without invoking any handler
+- **Handler that throws**: the exception propagates to the caller of `run`
+- **Handler that returns `Right`**: the value becomes the final result of `run` — the pipeline does not resume subsequent steps
+- **Context fields that steps will write must be initialised to `undefined`**: conflict detection treats any non-`undefined` value as already written by a previous step. A field initialised to `""`, `0`, `false`, or any other default in the constructor will be flagged as conflicting the first time a step tries to set it. Declare step-output fields as optional (`field?: Type`) with no default value.
 
 ---
 
 ## Alternatives considered
 
-- **`PipelineError<L>` come tipo unico** — scartato: obbliga lo switch sul tag; handler separati con tipo specifico sono più diretti
-- **Variadic generics per Ctx** — scartato: complessità TypeScript eccessiva; il beneficio (no campi opzionali) non giustifica la perdita di leggibilità e la difficoltà di manutenzione
-- **`run` restituisce `Promise<void>`** — scartato: il chiamante non può reagire programmaticamente al risultato
-- **Step restituisce `Partial<Ctx>`** — scartato: in favore del ritorno del Ctx completo, coerente con la firma degli handler
-- **L per step con union automatica** — scartato: un `L` condiviso (discriminated union) è la pratica standard
+- **`PipelineError<L>` as a single type** — rejected: forces a switch on the tag; separate handlers with specific types are more direct
+- **Variadic generics for Ctx** — rejected: excessive TypeScript complexity; the benefit (no optional fields) does not justify the loss of readability and maintainability
+- **`run` returning `Promise<void>`** — rejected: the caller cannot react programmatically to the result
+- **Step returning `Partial<Ctx>`** — rejected: in favour of returning the full Ctx, consistent with the handler signature
+- **L per step with automatic union** — rejected: a shared `L` (discriminated union) is the standard practice

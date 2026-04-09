@@ -3,8 +3,8 @@
     "rootDir": "./src",
     "outDir": "./dist",
 
-    "module": "ES2020",
-    "moduleResolution": "Bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "target": "ES2020",
     "types": [],
 
