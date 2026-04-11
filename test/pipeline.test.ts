@@ -5,7 +5,7 @@ import { Either, asTask } from "@ngwes/mini-fp";
 describe("Pipeline", () => {
     it("runs only normal step when no error", async () => {
         const context = new StepCtx("Hello world")
-        const step1: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
+        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
             return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: ctx.input }))
         }
         const options : PipelineOptions<StepError, StepCtx> = {
@@ -39,7 +39,7 @@ describe("Pipeline", () => {
 
     it("runs onConflictingKeys step when conflicting keys", async () => {
         const context = new StepCtx("Hello world")
-        const step1: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
+        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
             return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: "first" }))
         }
         const step2: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
@@ -81,7 +81,7 @@ describe("Pipeline", () => {
             throw new Error("exception message");
         }
 
-        const step1: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
+        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
             return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: "first" }))
         }
 
@@ -136,7 +136,7 @@ describe("Pipeline", () => {
 
     it("runs onConflictingKeys step when conflicting keys with right response", async () => {
         const context = new StepCtx("Hello world")
-        const step1: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
+        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
             return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: "first" }))
         }
         const step2: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
@@ -157,7 +157,7 @@ describe("Pipeline", () => {
 
     it("runs steps and accumulate context when no error", async () => {
         const context = new StepCtx("Hello world")
-        const step1: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
+        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
             return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: ctx.input }))
         }
 
@@ -180,7 +180,7 @@ describe("Pipeline", () => {
 
     it("runs only steps before error", async () => {
         const context = new StepCtx("Hello world")
-        const step1: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
+        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
             return asTask(Either.left<StepError, StepCtx>(new StepError("step 1 error")))
         }
 
