@@ -1,4 +1,6 @@
-import { Either, asTask } from "@ngwes/mini-fp";
+import { Either, Option, EitherAsync } from "@ngwes/mini-fp";
+
+const { from, right } = EitherAsync
 
 export type Step<E, Ctx> = (ctx: Readonly<Ctx>) => Promise<Either<E, Ctx>>;
 
@@ -16,15 +18,12 @@ export async function Pipeline<E, Ctx extends object>(
     let context = Either.right<E, Readonly<Ctx>>(Object.freeze(ctx));
     try {
         for (const step of steps) {
-             context = await context
-             .bindAsync(ctx =>  step(ctx)
-                            .then(_ => _.bindLeftAsync(err => options.onLeft(err, ctx))
-                                        .bindAsync(_ => 
-                                        {
-                                            const keys = getConflictingKeys<Ctx>(_, ctx)
-                                            return keys.length > 0 ? options.onConflictingKeys(keys as string[], ctx) :
-                                                                     asTask(Either.right<E, Readonly<Ctx>>(Object.freeze(_)));
-                                        })))
+            context = await context.bindAsync(ctx => from(step(ctx))
+                .bindLeftAsync(err => options.onLeft(err, ctx))
+                .bindAsync(_ => getConflictingKeys<Ctx>(_, ctx)
+                               .map(_ => from(options.onConflictingKeys(_ as string[], ctx)))
+                               .orElse(right<E, Readonly<Ctx>>(Object.freeze(_)) )
+                ))
         }
     }
     catch (err) {
@@ -34,7 +33,7 @@ export async function Pipeline<E, Ctx extends object>(
     return context;
 }
 
-function getConflictingKeys<Ctx extends object>(result: Ctx, context: Readonly<Ctx>) {
-    return (Object.keys(result) as Array<keyof Ctx>)
-        .filter((k) => context[k] !== undefined && result[k] !== context[k]);
+function getConflictingKeys<Ctx extends object>(result: Ctx, context: Readonly<Ctx>) : Option<(keyof Ctx)[]> {
+    return Option.from((Object.keys(result) as Array<keyof Ctx>)
+        .filter((k) => context[k] !== undefined && result[k] !== context[k]), _ => _.length == 0);
 }
