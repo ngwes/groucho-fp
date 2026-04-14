@@ -1,8 +1,10 @@
 import { type Step } from "../pipeline/Pipeline.js"
-import { resolve } from "node:path";
-import {createJiti} from "jiti"
+import { join, resolve } from "node:path";
+import { readdir } from "node:fs/promises";
+import { createJiti } from "jiti"
 
 const jiti = createJiti(import.meta.url);
+const filePatterns = /\.(ts|js|mjs|cjs)$/;
 
 export type DynamicStepModule<L, Ctx> =
     | { default: Step<L, Ctx> }
@@ -11,21 +13,46 @@ export type DynamicStepModule<L, Ctx> =
 
 
 export const loadSteps = async <L, Ctx>(paths: string[]): Promise<ReadonlyArray<Step<L, Ctx>>> => {
-    
+
     let steps: Step<L, Ctx>[] = [];
 
-    for(const path of paths){
-        const readStep = await jiti.import(resolve(path)) as any;
+    for (const path of paths) {
+        steps = steps.concat(await importSteps<L, Ctx>(path));
+    }
 
-        const imported = readStep.default ?? readStep.steps
-
-        if(typeof imported === 'function')
-            steps.push(imported as Step<L, Ctx>);
-        else
-        {
-            if(Array.isArray(imported))
-                steps.push(...imported as Step<L, Ctx>[])
-        }
-    }   
     return steps;
 };
+
+export const loadStepsFromDir = async <L, Ctx>(
+    path: string,
+    options?: { pattern?: RegExp }): Promise<ReadonlyArray<Step<L, Ctx>>> => {
+    const fileNamePatterns = options?.pattern ?? filePatterns;
+    const absolutePath = resolve(path);
+
+    const entries = await readdir(absolutePath, { withFileTypes: true });
+
+    const paths = entries
+        .filter(f => f.isFile() && fileNamePatterns.test(f.name))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(e => join(absolutePath, e.name))
+
+    return await loadSteps(paths);
+}
+
+
+async function importSteps<L, Ctx>(path: string): Promise<Step<L, Ctx>[]> {
+    let steps: Step<L, Ctx>[] = [];
+
+    const readStep = await jiti.import(resolve(path)) as Record<string, unknown>;
+
+    const imported = readStep.default ?? readStep.steps;
+
+    if (typeof imported === 'function')
+        steps.push(imported as Step<L, Ctx>);
+    else {
+        if (Array.isArray(imported))
+            steps.push(...imported as Step<L, Ctx>[]);
+    }
+
+    return steps;
+}
