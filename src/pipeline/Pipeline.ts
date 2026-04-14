@@ -1,6 +1,7 @@
 import { Either, Option, EitherAsync } from "@ngwes/mini-fp";
 
 const { from, right } = EitherAsync
+const { from: optionFrom} = Option
 
 export type Step<E, Ctx> = (ctx: Readonly<Ctx>) => Promise<Either<E, Ctx>>;
 
@@ -33,7 +34,8 @@ export async function Pipeline<E, Ctx extends object>(
     return context;
 }
 
-function getConflictingKeys<Ctx extends object>(result: Ctx, context: Readonly<Ctx>) : Option<(keyof Ctx)[]> {
-    return Option.from((Object.keys(result) as Array<keyof Ctx>)
-        .filter((k) => context[k] !== undefined && result[k] !== context[k]), _ => _.length == 0);
-}
+const getConflictingKeys = <Ctx extends object>(result: Ctx, context: Readonly<Ctx>) : Option<(keyof Ctx)[]> =>
+    optionFrom((Object.keys(result) as Array<keyof Ctx>)
+.filter((k) => context[k] !== undefined &&
+               result[k] !== context[k]),
+         _ => _.length == 0);
