@@ -12,13 +12,13 @@ export interface PipelineOptions<E, Ctx extends object> {
     onConflictingKeys: (keys: ReadonlyArray<string>, ctx: Readonly<Ctx>) => Promise<Either<E, Readonly<Ctx>>>
 }
 
-export async function Pipeline<E, Ctx extends object>(
+export function Pipeline<E, Ctx extends object>(
     ctx: Ctx,
     steps: ReadonlyArray<Step<E, Ctx>>,
     options: PipelineOptions<E, Ctx>
 ): Promise<Either<E, Readonly<Ctx>>> {
     let context = Either.right<E, Readonly<Ctx>>(Object.freeze(ctx));
-    return await runAsync(async () => {
+    return runAsync(async () => {
         for (const step of steps) {
             context = await context.bindAsync(ctx => from(step(ctx))
                 .bindLeftAsync(err => options.onLeft(err, ctx))
