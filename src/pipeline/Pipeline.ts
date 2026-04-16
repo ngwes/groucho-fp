@@ -29,7 +29,7 @@ export function Pipeline<E, Ctx extends object>(
         }
         return context
     })
-    .onFailAsync(async (err) => { return await context.bindAsync(_ => options.onException(err, _)) })
+    .onFailAsync((err) => context.bindAsync(_ => options.onException(err, _)))
 }
 
 const getConflictingKeys = <Ctx extends object>(result: Ctx, context: Readonly<Ctx>): Option<(keyof Ctx)[]> =>
