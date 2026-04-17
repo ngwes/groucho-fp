@@ -1,10 +1,10 @@
 {
   "name": "groucho-fp",
   "version": "1.2.0",
-  "description": "",
-  "keywords": [],
+  "description": "A functional-enabled dynamic-steps pipeline pattern implementation",
+  "keywords": ["functional-programming", "typescript", "pipeline", "steps"],
   "license": "ISC",
-  "author": "",
+  "author": "ngwes",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
