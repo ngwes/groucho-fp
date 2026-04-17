@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Pipeline, Step, PipelineOptions } from "../src";
+import { Pipeline } from "../src/index.js";
+import type { Step, PipelineOptions } from "../src/index.js";
 import { Either, asTask } from "@ngwes/mini-fp";
 
 describe("Pipeline", () => {
@@ -88,7 +89,7 @@ describe("Pipeline", () => {
         const context = new StepCtx("Hello world")
         const options : PipelineOptions<StepError, StepCtx> = {
             onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, errorStepOutput: err.errorMessage})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, exceptionStepOutput: ctx.step1output})),
+            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, exceptionStepOutput: ctx.step1output!})),
             onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
         }
 
@@ -103,7 +104,7 @@ describe("Pipeline", () => {
         const context = new StepCtx("Hello world")
         const options : PipelineOptions<StepError, StepCtx> = {
             onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, errorStepOutput: err.errorMessage})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, exceptionStepOutput: ctx.step1output})),
+            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, exceptionStepOutput: ctx.step1output!})),
             onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
         }
 
