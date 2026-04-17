@@ -1,5 +1,5 @@
 {
-  "name": "groucho-fp",
+  "name": "@ngwes/groucho-fp",
   "version": "1.2.0",
   "description": "A functional-enabled dynamic-steps pipeline pattern implementation",
   "keywords": ["functional-programming", "typescript", "pipeline", "steps"],
