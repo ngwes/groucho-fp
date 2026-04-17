@@ -45,7 +45,7 @@ async function importSteps<L, Ctx>(path: string): Promise<Step<L, Ctx>[]> {
 
     const readStep = await jiti.import(resolve(path)) as Record<string, unknown>;
 
-    const imported = readStep.default ?? readStep.steps;
+    const imported = readStep.steps ?? readStep.default;
 
     if (typeof imported === constants.functionKey)
         steps.push(imported as Step<L, Ctx>);
