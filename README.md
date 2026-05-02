@@ -252,9 +252,9 @@ const steps = await loadStepsFromDir<Err, Ctx>("./steps");
 
 const result = await Pipeline({ userId: "42" }, steps, options);
 
-result.fold(
-  (err) => console.error("Final error:", err),
+result.match(
   (ctx) => console.log("Done:", ctx),
+  (err) => console.error("Final error:", err)
 );
 ```
 
