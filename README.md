@@ -292,4 +292,4 @@ interface PipelineOptions<E, Ctx extends object> {
 ## Requirements
 
 - Node.js >= 18
-- `@ngwes/mini-fp` >= 1.0.4 (peer dependency)
+- `@ngwes/mini-fp` >= 1.4.0 (peer dependency)
