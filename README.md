@@ -19,6 +19,21 @@ npm install @ngwes/groucho-fp @ngwes/mini-fp
 
 ---
 
+## Agent Skills
+
+[`groucho-fp-skills`](https://github.com/ngwes/groucho-fp-skills) is a Claude Code plugin with skills that teach coding agents how to use this library: a router skill, reference skills for `Pipeline`, `Step` and `loadSteps` / `loadStepsFromDir`, and pattern skills for pipeline hooks, step composition and dynamic loading.
+
+Install it from within Claude Code:
+
+```text
+/plugin marketplace add ngwes/groucho-fp-skills
+/plugin install groucho-fp@groucho-fp-skills
+```
+
+See the [groucho-fp-skills README](https://github.com/ngwes/groucho-fp-skills#readme) for the other install options and for how to point your agent at the skills.
+
+---
+
 ## Core concepts
 
 ### Context (`Ctx`)
