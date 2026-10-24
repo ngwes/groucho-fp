@@ -1,3 +1,11 @@
+## [1.2.1](https://github.com/ngwes/groucho-fp/compare/v1.2.0...v1.2.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* require @ngwes/mini-fp 1.4.0 or later as the peer dependency ([0bf87aa](https://github.com/ngwes/groucho-fp/commit/0bf87aa0181fcea5674933b714cf48f06e4de40c))
+* return a native promise from pipeline with every mini-fp version ([ae5fcf4](https://github.com/ngwes/groucho-fp/commit/ae5fcf4a11cea10c5ff8b18005d41d3ad259e7dd))
+
 # [1.2.0](https://gitlab.com/nadir.gherbi1/groucho-fp/compare/v1.1.0...v1.2.0) (2026-04-17)
 
 
