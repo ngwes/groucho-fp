@@ -2,6 +2,14 @@
   "name": "@ngwes/groucho-fp",
   "version": "1.2.0",
   "description": "A functional-enabled dynamic-steps pipeline pattern implementation",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngwes/groucho-fp.git"
+  },
+  "homepage": "https://github.com/ngwes/groucho-fp#readme",
+  "bugs": {
+    "url": "https://github.com/ngwes/groucho-fp/issues"
+  },
   "keywords": ["functional-programming", "typescript", "pipeline", "steps"],
   "license": "ISC",
   "author": "ngwes",
