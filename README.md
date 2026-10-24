@@ -7,6 +7,10 @@ It provides two things:
 - **`Pipeline`** — runs a sequence of steps over a shared context, with explicit hooks for errors, exceptions, and key conflicts.
 - **`loadSteps` / `loadStepsFromDir`** — dynamically imports step files at runtime, so pipelines can be assembled from the filesystem without being statically wired at build time.
 
+<!-- docs-site:skip-start -->
+**Documentation:** <https://ngwes.github.io/groucho-fp/>
+<!-- docs-site:skip-end -->
+
 ---
 
 ## Installation
