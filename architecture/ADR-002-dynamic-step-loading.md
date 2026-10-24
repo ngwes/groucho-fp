@@ -166,7 +166,7 @@ export async function loadStepsFromDir<L, Ctx>(
 ```typescript
 // extensions/enrichContext.ts  — TypeScript, no compilation needed
 
-import type { Step } from 'groucho-fp';
+import type { Step } from '@ngwes/groucho-fp';
 import type { AppError, AppContext } from '../types.js';
 
 const enrichContext: Step<AppError, AppContext> = async (ctx) => {

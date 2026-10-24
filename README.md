@@ -12,7 +12,7 @@ It provides two things:
 ## Installation
 
 ```bash
-npm install groucho-fp @ngwes/mini-fp
+npm install @ngwes/groucho-fp @ngwes/mini-fp
 ```
 
 `@ngwes/mini-fp` is a peer dependency and must be installed alongside this package.
@@ -38,7 +38,7 @@ type Ctx = {
 A `Step` is an async function that takes the current context and returns `Either<E, Ctx>`:
 
 ```ts
-import type { Step } from "groucho-fp";
+import type { Step } from "@ngwes/groucho-fp";
 import { Either } from "@ngwes/mini-fp";
 
 const parseStep: Step<string, Ctx> = async (ctx) => {
@@ -66,7 +66,7 @@ const parseStep: Step<string, Ctx> = async (ctx) => {
 ## `Pipeline`
 
 ```ts
-import { Pipeline } from "groucho-fp";
+import { Pipeline } from "@ngwes/groucho-fp";
 
 const result = await Pipeline(initialCtx, steps, options);
 ```
@@ -116,9 +116,9 @@ interface PipelineOptions<E, Ctx extends object> {
 ### Minimal example
 
 ```ts
-import { Pipeline } from "groucho-fp";
+import { Pipeline } from "@ngwes/groucho-fp";
 import { Either } from "@ngwes/mini-fp";
-import type { Step, PipelineOptions } from "groucho-fp";
+import type { Step, PipelineOptions } from "@ngwes/groucho-fp";
 
 type Ctx = { input: string; result?: string };
 type Err = { message: string };
@@ -150,7 +150,7 @@ These functions dynamically load step files at runtime using [jiti](https://gith
 Loads steps from an explicit list of file paths.
 
 ```ts
-import { loadSteps } from "groucho-fp";
+import { loadSteps } from "@ngwes/groucho-fp";
 
 const steps = await loadSteps<Err, Ctx>([
   "./steps/validate.ts",
@@ -165,7 +165,7 @@ Steps from each file are appended in the order the paths are provided.
 Scans a directory for step files and loads them in **alphabetical order** by filename.
 
 ```ts
-import { loadStepsFromDir } from "groucho-fp";
+import { loadStepsFromDir } from "@ngwes/groucho-fp";
 
 const steps = await loadStepsFromDir<Err, Ctx>("./steps");
 
@@ -226,8 +226,8 @@ Files that export none of the above are silently ignored (they contribute zero s
 ## Putting it together
 
 ```ts
-import { Pipeline, loadStepsFromDir } from "groucho-fp";
-import type { PipelineOptions } from "groucho-fp";
+import { Pipeline, loadStepsFromDir } from "@ngwes/groucho-fp";
+import type { PipelineOptions } from "@ngwes/groucho-fp";
 
 type Ctx  = { userId: string; profile?: Record<string, unknown> };
 type Err  = { code: string; detail: string };
