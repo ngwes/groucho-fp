@@ -21,6 +21,22 @@ describe("Pipeline", () => {
         expect(result.unwrapRight().step1output).toBe("Hello world");
     })
 
+    it("returns a native Promise whatever the mini-fp version", async () => {
+        const context = new StepCtx("Hello world")
+        const options : PipelineOptions<StepError, StepCtx> = {
+            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right({...ctx, errorStepOutput: "error"})),
+            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right({...ctx, exceptionStepOutput: "exception"})),
+            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
+        }
+
+        const result = Pipeline(context, [], options)
+
+        expect(result).toBeInstanceOf(Promise);
+        expect(typeof result.catch).toBe("function");
+        expect(typeof result.finally).toBe("function");
+        expect((await result).isRight()).toBe(true);
+    })
+
     it("runs onLeft step when error", async () => {
         const step1: Step<StepError, StepCtx> = (ctx: StepCtx) => {
             return asTask(Either.left<StepError, StepCtx>(new StepError("error message")))

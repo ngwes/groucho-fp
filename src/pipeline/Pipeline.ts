@@ -18,7 +18,7 @@ export function Pipeline<E, Ctx extends object>(
     options: PipelineOptions<E, Ctx>
 ): Promise<Either<E, Readonly<Ctx>>> {
     let context = Either.right<E, Readonly<Ctx>>(Object.freeze(ctx));
-    return runAsync(async () => {
+    const result = runAsync(async () => {
         for (const step of steps) {
             context = await context.bindAsync(ctx => from(step(ctx))
                 .bindLeftAsync(err => options.onLeft(err, ctx))
@@ -30,6 +30,9 @@ export function Pipeline<E, Ctx extends object>(
         return context
     })
     .onFailAsync((err) => context.bindAsync(_ => options.onException(err, _)))
+
+    // mini-fp >= 1.5 returns an EitherAsync here, which is not a Promise: always hand back a native one
+    return Promise.resolve(result)
 }
 
 const getConflictingKeys = <Ctx extends object>(result: Ctx, context: Readonly<Ctx>): Option<(keyof Ctx)[]> =>
