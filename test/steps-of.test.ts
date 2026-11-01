@@ -47,9 +47,21 @@ describe("stepsOf", () => {
     it("rejects an array that contains something other than functions", () => {
         const error = load({ default: [f, "x"] }).unwrapLeft();
 
-        expect(error.tag).toBe("invalid-export");
-        expect(error.path).toBe(path);
-        expect(error).toMatchObject({ detail: expect.stringContaining("string") });
+        expect(error).toEqual({ tag: "invalid-export", path, detail: "default export contains a string, not a step" });
+    });
+
+    it.each([
+        [[f, undefined], "default export contains undefined, not a step"],
+        [[f, null], "default export contains null, not a step"],
+        [[f, {}], "default export contains an object, not a step"],
+        [{ run: f }, "default export is an object"],
+    ])("describes the invalid default export %o", (exported, detail) => {
+        expect(load({ default: exported }).unwrapLeft()).toEqual({ tag: "invalid-export", path, detail });
+    });
+
+    it("rejects a module whose default export is null or undefined as having none", () => {
+        expect(load({ default: null }).unwrapLeft()).toEqual({ tag: "invalid-export", path, detail: "no steps or default export" });
+        expect(load({ default: undefined }).unwrapLeft()).toEqual({ tag: "invalid-export", path, detail: "no steps or default export" });
     });
 
     it("names the steps export when that is the invalid one", () => {

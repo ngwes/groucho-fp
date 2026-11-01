@@ -63,6 +63,13 @@ describe("loadSteps", () => {
         expect(result.unwrapRight()).toEqual([]);
     });
 
+    it("loads a CommonJS file whose module.exports is the step", async () => {
+        const steps = (await loadSteps<string, StepCtx>([fixture("commonjs/module-exports-step.ts")])).unwrapRight();
+
+        expect(steps).toHaveLength(1);
+        expect(typeof steps[0]).toBe("function");
+    });
+
     it("reports every bad file, in path order", async () => {
         const result = await loadSteps<string, StepCtx>([
             fixture("invalid/no-export.ts"),
@@ -89,6 +96,30 @@ describe("loadSteps", () => {
         expect(result.unwrapLeft()).toEqual([
             { tag: "import-failed", path: fixture("broken/throws-null.ts"), cause: null },
             expect.objectContaining({ tag: "not-found", path: fixture("valid/missing.ts") }),
+        ]);
+    });
+
+    it("reports a module with no steps or default export as such", async () => {
+        const result = await loadSteps<string, StepCtx>([
+            fixture("invalid/no-export.ts"),
+            fixture("invalid/exports-undefined.cjs"),
+        ]);
+
+        expect(result.unwrapLeft().map(error => error.tag === "invalid-export" && error.detail)).toEqual([
+            "no steps or default export",
+            "no steps or default export",
+        ]);
+    });
+
+    it("describes an invalid default export", async () => {
+        const result = await loadSteps<string, StepCtx>([
+            fixture("invalid/not-a-step.ts"),
+            fixture("invalid/mixed-array.ts"),
+        ]);
+
+        expect(result.unwrapLeft().map(error => error.tag === "invalid-export" && error.detail)).toEqual([
+            "default export is a number",
+            "default export contains a string, not a step",
         ]);
     });
 
@@ -143,6 +174,6 @@ describe("loadStepsFromDir", () => {
         const result = await loadStepsFromDir<string, StepCtx>(fixture("invalid"));
 
         const errors = result.unwrapLeft();
-        expect(errors.map(error => error.tag)).toEqual(["invalid-export", "invalid-export", "invalid-export", "invalid-export"]);
+        expect(errors.map(error => error.tag)).toEqual(Array(5).fill("invalid-export"));
     });
 });
