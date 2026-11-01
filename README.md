@@ -300,7 +300,8 @@ import { loadSteps } from "@ngwes/groucho-fp";
 type Ctx = { input: string; validated?: boolean };
 type Err = { message: string };
 
-const steps = await loadSteps<Err, Ctx>(["./steps/validate.ts", "./steps/transform.ts"]);
+// an Either: the steps, or the load errors
+const loaded = await loadSteps<Err, Ctx>(["./steps/validate.ts", "./steps/transform.ts"]);
 ```
 
 ### `loadStepsFromDir`
@@ -313,7 +314,7 @@ import { loadStepsFromDir } from "@ngwes/groucho-fp";
 type Ctx = { input: string; validated?: boolean };
 type Err = { message: string };
 
-const steps = await loadStepsFromDir<Err, Ctx>("./steps");
+const loaded = await loadStepsFromDir<Err, Ctx>("./steps");
 
 // only the files whose name matches the pattern
 const tagged = await loadStepsFromDir<Err, Ctx>("./steps", { pattern: /\.step\.ts$/ });
@@ -321,7 +322,7 @@ const tagged = await loadStepsFromDir<Err, Ctx>("./steps", { pattern: /\.step\.t
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `pattern` | `.ts`, `.js`, `.mjs` and `.cjs` files, except `.d.ts`, `.test.*` and `.spec.*` files | A regular expression tested against each file name. Only matching files are loaded. |
+| `pattern` | `.ts`, `.js`, `.mjs` and `.cjs` files, except `.d.ts`, `.test.*` and `.spec.*` files | A regular expression tested against each file name. Only matching files are loaded. Its `g` and `y` flags are ignored. |
 
 **A steps folder holds only step files.** Every file the pattern matches must export steps; a helper module or a type-only file in the folder is reported as an `invalid-export` error and the whole load is a `left`. Keep shared code outside the folder, or pass a `pattern` that only matches the step files.
 
@@ -386,7 +387,7 @@ Each file that cannot be loaded gives one `LoadError`. Every file is attempted, 
 
 | `tag` | Meaning | Extra field |
 |-------|---------|-------------|
-| `not-found` | The file, or the directory given to `loadStepsFromDir`, does not exist. | `cause` |
+| `not-found` | The file, or the directory given to `loadStepsFromDir`, does not exist or cannot be read. | `cause` |
 | `import-failed` | The file exists but importing it failed: a syntax error, a module that throws when imported, a missing dependency. | `cause` |
 | `invalid-export` | The file imported fine but has no usable `steps` or `default` export. | `detail` |
 
@@ -509,12 +510,13 @@ The package exports `Pipeline`, `loadSteps` and `loadStepsFromDir`, and the type
 
 ## Migrating from 1.x
 
-- **mini-fp 2.** `@ngwes/mini-fp` 2.0.0 or later is the required peer dependency. See its changelog for its own changes (prelude `right` / `left`, lazy `Try`).
-- **`Pipeline` returns an `EitherAsync`**, not a native `Promise`. `await Pipeline(...)` still gives an `Either`; code that called `.then` / `.catch` on the result should `await` it or chain `match` / `map` instead.
+- **mini-fp 2.** `@ngwes/mini-fp` 2.x (`^2.0.0`) is the required peer dependency. See its changelog for its own changes (prelude `right` / `left`, lazy `Try`).
+- **`Pipeline` returns an `EitherAsync`**, not a native `Promise`. `await Pipeline(...)` still gives an `Either`, and `.then` still works. `.catch`, `.finally` and `instanceof Promise` do not: `await` the result (in a `try` if a hook may throw), or chain `match` / `map` instead.
 - **Steps and hooks may return an `Either`, a promise of one, or an `EitherAsync`** (the new `StepResult` type). Existing `async` steps and hooks keep working; they no longer need to be `async`.
 - **`onLeft` is optional.** Without it, a step's `left` stops the pipeline unchanged. A 1.x `onLeft: async (err) => Either.left(err)` can be removed.
 - **A hook returning `right` continues with the next step, for every hook, `onException` included.** In 1.x, `onException` returning `right` ended the pipeline with that context. To stop, return `left`.
 - **`onConflictingKeys` receives `(keys, ctx, next)`**: `next` is the context the step returned, so the hook can accept it with `right(next)`. The keys are typed `keyof Ctx & string`.
+- **A hook's context is not conflict-checked.** In 1.x, the context returned by a recovering `onLeft` went through the conflict check, so `onConflictingKeys` ran when it overwrote a value. In 2.0 no hook's output is checked: the hook has the last word. If your `onLeft` relied on that check, compare the keys in `onLeft` itself.
 - **The initial context is copied before it is frozen.** 1.x froze the object you passed in. Contexts must be plain objects: a class instance loses its prototype in the copy.
 - **Dropped keys count as conflicts.** A step that returns a context without a key that held a value now triggers `onConflictingKeys`.
 - **`loadSteps` and `loadStepsFromDir` return `EitherAsync<ReadonlyArray<LoadError>, ReadonlyArray<Step>>`** instead of throwing. Replace `try { await loadSteps(...) }` with `match` or `mapLeft` on the result (see [Load errors](#load-errors)).
@@ -527,4 +529,4 @@ The package exports `Pipeline`, `loadSteps` and `loadStepsFromDir`, and the type
 ## Requirements
 
 - Node.js >= 18
-- `@ngwes/mini-fp` >= 2.0.0 (peer dependency)
+- `@ngwes/mini-fp` 2.x (`^2.0.0`, peer dependency)

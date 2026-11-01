@@ -15,6 +15,7 @@
 - Steps and hooks had to return a `Promise<Either>`, even when they had nothing to await.
 - The hooks did not agree with each other: `onLeft` and `onConflictingKeys` returning `right` continued with the next step, `onException` returning `right` ended the pipeline. ADR-001 says all three end it.
 - `onConflictingKeys` only received the keys and the previous context, so it could not accept the step's output.
+- The context a recovering `onLeft` returned went through the conflict check (so `onConflictingKeys` could run on a hook's overwrite), while the other hooks' contexts did not.
 - Conflict detection only looked at the keys of the returned context: a step that dropped a key was not caught.
 - The caller's initial object was frozen in place.
 - The loaders threw on a missing file or a broken module, and silently skipped a module with no usable export, although ADR-002 promised an error. They named the error type `L` while the pipeline uses `E`.
@@ -111,7 +112,7 @@ The hook receives the context the step returned as `next`, so it can accept the 
 
 ### A hook's output is not conflict-checked
 
-The context a hook returns becomes the current context without a conflict check: the hook is the arbiter. It is frozen like any other context.
+The context a hook returns becomes the current context without a conflict check: the hook is the arbiter. It is frozen like any other context. This holds for `onLeft` too, whose output 1.x did check.
 
 ### A throwing hook rejects the result
 
@@ -129,14 +130,14 @@ A key conflicts when the current context holds a value for it (anything but `und
 
 - `loadSteps` and `loadStepsFromDir` never throw. They return `right(steps)`, or `left` of every `LoadError`.
 - **Accumulation**: every file is attempted and every failure is reported, in path order (`Validate` + `sequenceValidate`). Steps keep path order (`loadSteps`) and file-name order (`loadStepsFromDir`).
-- **Existence first**: `importModule` checks that the file exists (`fs.access`) before importing it. A missing file is `not-found`; a file that exists but fails to import (syntax error, throwing module, missing dependency of the step) is `import-failed`. This avoids guessing from jiti's or Node's error codes, where a missing dependency and a missing step file look alike. A missing directory given to `loadStepsFromDir` is one `not-found` error; an empty one is `right([])`.
-- **Valid modules**: the `steps` export if present, else `default`; it must be a function or an array of functions. An empty array is valid. Anything else, including a module with neither export, is `invalid-export` with a `detail` saying what was found. This is what ADR-002 promised.
+- **Existence first**: `importModule` checks that the file exists (`fs.access`) before importing it. A missing file is `not-found`; a file that exists but fails to import (syntax error, throwing module, missing dependency of the step) is `import-failed`. This avoids guessing from jiti's or Node's error codes, where a missing dependency and a missing step file look alike. A directory given to `loadStepsFromDir` that is missing or cannot be read is one `not-found` error; an empty one is `right([])`.
+- **Valid modules**: the `steps` export if present, else `default`; it must be a function or an array of functions. An empty array is valid. Anything else, including a module with neither export or whose exports are `null` / `undefined`, is `invalid-export` with a `detail` saying what was found. This is what ADR-002 promised.
 - **Default pattern**: `.ts`, `.js`, `.mjs` and `.cjs` files, except `.d.ts`, `.test.*` and `.spec.*` files. Because one non-step file now fails the whole load, the default skips the files most likely to sit next to steps by accident. A steps folder should hold only step files, or the caller passes a `pattern`.
 - The type parameters are named `E` and `Ctx`, like the pipeline's.
 
 ### Internals
 
-mini-fp 2 is used where it reads well: the step loop is a `foldAsync` of `bindAsync` over an `EitherAsync`, the exception boundary is `TryAsync.runAsync(...).toEither()`, the conflict check returns an `Option` (`toOption`), the export check uses `which`, the loaders accumulate with `Validate`.
+mini-fp 2 is used where it reads well: the step loop is a `foldAsync` of `bindAsync` over an `EitherAsync`, the exception boundary is `TryAsync.runAsync(...).match(...)`, which hands the exception to `onException` (or to a `LoadError`) as is and calls it outside the boundary (a step or a module may throw `undefined`, which a `left` cannot hold), the conflict check returns an `Option` (`toOption`), the export check uses `which`, the loaders accumulate with `Validate`.
 
 ---
 
@@ -155,7 +156,7 @@ mini-fp 2 is used where it reads well: the step loop is a `foldAsync` of `bindAs
 
 - **Breaking release**: callers must handle an `EitherAsync` result, the new hook semantics (`onException` returning `right` now continues), the new `onConflictingKeys` parameters and the loaders' `left` instead of an exception.
 - **One non-step file fails a directory load**: a helper or type-only module matched by the pattern is an `invalid-export`. The default pattern and the docs reduce the risk; it cannot be removed without silently skipping files again.
-- **Hooks are trusted**: a hook can return a context that overwrites earlier values, and nothing checks it.
+- **Hooks are trusted**: a hook can return a context that overwrites earlier values, and nothing checks it. A recovering `onLeft` that overwrote a value triggered `onConflictingKeys` in 1.x; it no longer does.
 - **Plain objects only**: the copy drops class prototypes.
 - **The existence check is a separate step**: a file deleted between the check and the import is reported as `import-failed`.
 - **mini-fp 2 has no empty `Either`**: `right(undefined)` and `left(undefined)` throw, so a step must always return a context and a hook's `left` must carry a real error value.
@@ -166,6 +167,8 @@ mini-fp 2 is used where it reads well: the step loop is a `foldAsync` of `bindAs
 - **Hook returning `right`**: the pipeline continues with the next step (ADR-001 said it ended the pipeline).
 - **Hook that throws or rejects**: the result rejects with that error; no other hook runs.
 - **Step whose promise rejects**: same as a throw, `onException` runs.
+- **Step that throws `undefined` or rejects with no reason**: `onException` runs with `undefined`.
+- **Module that throws `null` on import**: `import-failed` with a `null` cause; one whose exports are `null` is `invalid-export`.
 - **`null` is a written value**: changing it later conflicts. Only `undefined` counts as not written.
 - **New object, same content**: a conflict, since the comparison is `!==`.
 - **Empty array export**: valid, zero steps.
