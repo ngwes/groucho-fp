@@ -41,12 +41,14 @@ export const loadSteps = <E, Ctx>(
 /**
  * Loads the steps from the files of a directory, ordered by name. Only files matching `pattern` are loaded;
  * by default, .ts/.js/.mjs/.cjs files other than declaration (.d.ts), test (.test.*) and spec (.spec.*) files.
+ * The `g` and `y` flags are ignored: they would make the test of one name depend on the previous one.
  */
 export const loadStepsFromDir = <E, Ctx>(
     dir: string,
     options?: { pattern?: RegExp },
 ): EitherAsync<ReadonlyArray<LoadError>, ReadonlyArray<Step<E, Ctx>>> => {
-    const pattern = options?.pattern ?? constants.filePatterns;
+    const { source, flags } = options?.pattern ?? constants.filePatterns;
+    const pattern = new RegExp(source, flags.replace(/[gy]/g, ""));
     const absolute = resolve(dir);
 
     return TryAsync.runAsync(() => readdir(absolute, { withFileTypes: true })).toEither()

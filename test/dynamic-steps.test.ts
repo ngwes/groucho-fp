@@ -165,10 +165,19 @@ describe("loadStepsFromDir", () => {
             { pattern: /\.custom\.ts$/ },
         )).unwrapRight();
 
-        expect(steps).toHaveLength(1);
-        const result = await steps[0]!(new StepCtx("test"));
-        expect(result.unwrapRight().value1).toBe("test:custom");
+        expect(steps).toHaveLength(2);
+        expect((await steps[0]!(new StepCtx("test"))).unwrapRight().value2).toBe("test:another");
+        expect((await steps[1]!(new StepCtx("test"))).unwrapRight().value1).toBe("test:custom");
     });
+
+    it.each([/\.custom\.ts$/g, /\.custom\.ts$/y, /\.custom\.ts$/gy])(
+        "loads every matching file with a stateful pattern %s",
+        async pattern => {
+            const steps = (await loadStepsFromDir<string, StepCtx>(fixture("custom"), { pattern })).unwrapRight();
+
+            expect(steps).toHaveLength(2);
+        },
+    );
 
     it("fails the whole load when a file is not a step file", async () => {
         const result = await loadStepsFromDir<string, StepCtx>(fixture("invalid"));
