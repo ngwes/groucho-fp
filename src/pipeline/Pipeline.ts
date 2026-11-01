@@ -1,42 +1,42 @@
-import { Either, Option, EitherAsync, TryAsync } from "@ngwes/mini-fp";
+import { EitherAsync, TryAsync, foldAsync, left, right } from "@ngwes/mini-fp";
+import { conflictingKeys } from "./conflicts.js";
+import { freezeCopy } from "./context.js";
+import type { PipelineOptions, Step, StepResult } from "./types.js";
 
-const { from, right } = EitherAsync
-const { from: optionFrom } = Option
-const { runAsync } = TryAsync
-
-export type Step<E, Ctx> = (ctx: Readonly<Ctx>) => Promise<Either<E, Ctx>>;
-
-export interface PipelineOptions<E, Ctx extends object> {
-    onLeft: (err: E, ctx: Readonly<Ctx>) => Promise<Either<E, Readonly<Ctx>>>,
-    onException: (exception: unknown, ctx: Readonly<Ctx>) => Promise<Either<E, Readonly<Ctx>>>,
-    onConflictingKeys: (keys: ReadonlyArray<string>, ctx: Readonly<Ctx>) => Promise<Either<E, Readonly<Ctx>>>
-}
-
+/**
+ * Runs `steps` in order over a frozen copy of `ctx`. A step's left, exception or
+ * conflicting keys go to the matching hook: a hook's right continues with the next
+ * step, its left stops the pipeline. A hook that throws or rejects rejects the result.
+ */
 export function Pipeline<E, Ctx extends object>(
     ctx: Ctx,
     steps: ReadonlyArray<Step<E, Ctx>>,
-    options: PipelineOptions<E, Ctx>
-): Promise<Either<E, Readonly<Ctx>>> {
-    let context = Either.right<E, Readonly<Ctx>>(Object.freeze(ctx));
-    const result = runAsync(async () => {
-        for (const step of steps) {
-            context = await context.bindAsync(ctx => from(step(ctx))
-                .bindLeftAsync(err => options.onLeft(err, ctx))
-                .bindAsync(_ => getConflictingKeys<Ctx>(_, ctx)
-                    .map(_ => from(options.onConflictingKeys(_ as string[], ctx)))
-                    .orElse(right<E, Readonly<Ctx>>(Object.freeze(_)))
-                ))
-        }
-        return context
-    })
-    .onFailAsync((err) => context.bindAsync(_ => options.onException(err, _)))
-
-    // mini-fp >= 1.5 returns an EitherAsync here, which is not a Promise: always hand back a native one
-    return Promise.resolve(result)
+    options: PipelineOptions<E, Ctx>,
+): EitherAsync<E, Readonly<Ctx>> {
+    return EitherAsync.from(foldAsync(
+        [...steps],
+        right<E, Readonly<Ctx>>(freezeCopy(ctx)),
+        (acc, step) => acc.bindAsync(current => runStep(step, current, options)),
+    ));
 }
 
-const getConflictingKeys = <Ctx extends object>(result: Ctx, context: Readonly<Ctx>): Option<(keyof Ctx)[]> =>
-    optionFrom((Object.keys(result) as Array<keyof Ctx>)
-        .filter((k) => context[k] !== undefined &&
-            result[k] !== context[k]),
-        _ => _.length == 0);
+const runStep = <E, Ctx extends object>(
+    step: Step<E, Ctx>,
+    current: Readonly<Ctx>,
+    options: PipelineOptions<E, Ctx>,
+): EitherAsync<E, Readonly<Ctx>> =>
+    EitherAsync.from(
+        // Only the step runs inside the TryAsync: `match` calls the hooks after it, so a throwing or
+        // rejecting hook rejects the pipeline. The exception goes to onException as is, never into a
+        // left: a step may throw undefined, which a left cannot hold.
+        TryAsync.runAsync(async () => step(current)).match(
+            outcome => outcome.match<StepResult<E, Ctx>>(
+                next => conflictingKeys(current, next).match(
+                    keys => options.onConflictingKeys(keys, current, next),
+                    () => right(next),
+                ),
+                error => options.onLeft?.(error, current) ?? left(error),
+            ),
+            exception => options.onException(exception, current),
+        ),
+    ).map(freezeCopy);

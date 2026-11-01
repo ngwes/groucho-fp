@@ -1,6 +1,6 @@
 # ADR-001: Pipeline with Railway Oriented Programming on mini-fp
 
-**Status:** Accepted  
+**Status:** Accepted — superseded in part by [ADR-003](ADR-003-mini-fp-2-and-hook-recovery.md)  
 **Date:** 2026-04-03  
 **Author:** ngwes
 

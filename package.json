@@ -1,7 +1,7 @@
 {
   "name": "@ngwes/groucho-fp",
   "version": "1.2.1",
-  "description": "A functional-enabled dynamic-steps pipeline pattern implementation",
+  "description": "Typed, functional pipelines for TypeScript: run steps over a shared context with recoverable failure hooks, and load steps from files at runtime. Built on @ngwes/mini-fp.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ngwes/groucho-fp.git"
@@ -37,7 +37,7 @@
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
-    "@ngwes/mini-fp": "^1.5.1",
+    "@ngwes/mini-fp": "^2.0.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@types/node": "^25.5.0",
@@ -51,7 +51,7 @@
     "node": ">=18"
   },
   "peerDependencies": {
-    "@ngwes/mini-fp": ">=1.4.0"
+    "@ngwes/mini-fp": "^2.0.0"
   },
   "dependencies": {
     "jiti": "^2.6.1"
