@@ -1,4 +1,4 @@
-import { type Step } from "../pipeline/Pipeline.js"
+import { type Step } from "../pipeline/types.js"
 import { join, resolve } from "node:path";
 import { readdir } from "node:fs/promises";
 import { createJiti } from "jiti"

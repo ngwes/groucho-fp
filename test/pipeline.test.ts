@@ -1,238 +1,252 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { EitherAsync, left, right } from "@ngwes/mini-fp";
 import { Pipeline } from "../src/index.js";
-import type { Step, PipelineOptions } from "../src/index.js";
-import { Either, asTask } from "@ngwes/mini-fp";
+import type { PipelineOptions, Step } from "../src/index.js";
 
-describe("Pipeline", () => {
-    it("runs only normal step when no error", async () => {
-        const context = new StepCtx("Hello world")
-        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
-            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: ctx.input }))
-        }
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right({...ctx, errorStepOutput: "error"})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right({...ctx, exceptionStepOutput: "exception"})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
-        }
+type Ctx = { input: string; a?: string | null; b?: string; fixed?: string; u?: { id: number } };
+type Err = { tag: string };
 
-        const result = await Pipeline(context, [step1], options)
-
-        expect(result.isRight()).toBe(true);
-        expect(result.unwrapRight().step1output).toBe("Hello world");
-    })
-
-    it("returns a native Promise whatever the mini-fp version", async () => {
-        const context = new StepCtx("Hello world")
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right({...ctx, errorStepOutput: "error"})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right({...ctx, exceptionStepOutput: "exception"})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
-        }
-
-        const result = Pipeline(context, [], options)
-
-        expect(result).toBeInstanceOf(Promise);
-        expect(typeof result.catch).toBe("function");
-        expect(typeof result.finally).toBe("function");
-        expect((await result).isRight()).toBe(true);
-    })
-
-    it("runs onLeft step when error", async () => {
-        const step1: Step<StepError, StepCtx> = (ctx: StepCtx) => {
-            return asTask(Either.left<StepError, StepCtx>(new StepError("error message")))
-        }
-        const context = new StepCtx("Hello world")
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, errorStepOutput: err.errorMessage})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right({...ctx, exceptionStepOutput: "exception"})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
-        }
-
-        const result = await Pipeline(context, [step1], options)
-
-        expect(result.isRight()).toBe(true);
-        expect(result.unwrapRight().errorStepOutput).toBe("error message");
-    })
-
-    it("runs onConflictingKeys step when conflicting keys", async () => {
-        const context = new StepCtx("Hello world")
-        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
-            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: "first" }))
-        }
-        const step2: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
-            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: "second" }))
-        }
-        
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right({...ctx, errorStepOutput: "error"})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right({...ctx, exceptionStepOutput: "exception"})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.left<StepError, StepCtx>(new StepError(`keys: ${keys}`))),
-        }
-
-        const result = await Pipeline(context, [step1, step2], options)
-
-        expect(result.isLeft()).toBe(true);
-        expect(result.unwrapLeft().errorMessage).toBe("keys: step1output");
-    })
-
-    it("runs onException step when error", async () => {
-        const step1: Step<StepError, StepCtx> = (ctx: StepCtx) => {
-            throw new Error("exception message");
-        }
-
-        const context = new StepCtx("Hello world")
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, errorStepOutput: err.errorMessage})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, exceptionStepOutput: (err as Error).message})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
-        }
-
-        const result = await Pipeline(context, [step1], options)
-
-        expect(result.isRight()).toBe(true);
-        expect(result.unwrapRight().exceptionStepOutput).toBe("exception message");
-    })
-
-    it("runs onException step when error with value coming from the first step", async () => {
-        const step2: Step<StepError, StepCtx> = (ctx: StepCtx) => {
-            throw new Error("exception message");
-        }
-
-        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
-            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: "first" }))
-        }
-
-        const context = new StepCtx("Hello world")
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, errorStepOutput: err.errorMessage})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, exceptionStepOutput: ctx.step1output!})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
-        }
-
-        const result = await Pipeline(context, [step1, step2], options)
-
-        expect(result.isRight()).toBe(true);
-        expect(result.unwrapRight().exceptionStepOutput).toBe("first");
-    })
-
-    it("runs nothing  when no steps provider", async () => {
-        
-        const context = new StepCtx("Hello world")
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, errorStepOutput: err.errorMessage})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, exceptionStepOutput: ctx.step1output!})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
-        }
-
-        const result = await Pipeline(context, [], options)
-
-        expect(result.isRight()).toBe(true);
-        const resultContext = result.unwrapRight();
-        expect(resultContext.step1output).toBeUndefined();
-        expect(resultContext.errorStepOutput).toBeUndefined();
-        expect(resultContext.conflictingKeysStepOutput).toBeUndefined();
-        expect(resultContext.exceptionStepOutput).toBeUndefined();
-    })
-
-    it("runs onLeft step that return a left when error", async () => {
-        const step1: Step<StepError, StepCtx> = (ctx: StepCtx) => {
-            return asTask(Either.left<StepError, StepCtx>(new StepError("error message")))
-        }
-        const context = new StepCtx("Hello world")
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.left<StepError, StepCtx>(err)),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right({...ctx, exceptionStepOutput: "exception"})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
-        }
-
-        const result = await Pipeline(context, [step1], options)
-
-        expect(result.isLeft()).toBe(true);
-        expect(result.unwrapLeft().errorMessage).toBe("error message");
-    })
-
-    it("runs onConflictingKeys step when conflicting keys with right response", async () => {
-        const context = new StepCtx("Hello world")
-        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
-            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: "first" }))
-        }
-        const step2: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
-            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: "second" }))
-        }
-        
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right({...ctx, errorStepOutput: "error"})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right({...ctx, exceptionStepOutput: "exception"})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right<StepError, StepCtx>({...ctx, step1output: "conflictingKeys"}))
-        }
-
-        const result = await Pipeline(context, [step1, step2], options)
-
-        expect(result.isRight()).toBe(true);
-        expect(result.unwrapRight().step1output).toBe("conflictingKeys");
-    })
-
-    it("runs steps and accumulate context when no error", async () => {
-        const context = new StepCtx("Hello world")
-        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
-            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step1output: ctx.input }))
-        }
-
-        const step2: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
-            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step2output: ctx.input +" "+ ctx.step1output }))
-        }
-
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.right({...ctx, errorStepOutput: "error"})),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right({...ctx, exceptionStepOutput: "exception"})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
-        }
-
-        const result = await Pipeline(context, [step1, step2], options)
-
-        expect(result.isRight()).toBe(true);
-        expect(result.unwrapRight().step1output).toBe("Hello world");
-        expect(result.unwrapRight().step2output).toBe("Hello world Hello world");
-    })
-
-    it("runs only steps before error", async () => {
-        const context = new StepCtx("Hello world")
-        const step1: Step<StepError, StepCtx> = (ctx: Readonly<StepCtx>) => {
-            return asTask(Either.left<StepError, StepCtx>(new StepError("step 1 error")))
-        }
-
-        let step2Executed:boolean = false;
-        const step2: Step<StepError, Readonly<StepCtx>> = (ctx: StepCtx) => {
-            step2Executed = true;
-            return asTask(Either.right<StepError, StepCtx>({ ...ctx, step2output: ctx.input }))
-        }
-
-        const options : PipelineOptions<StepError, StepCtx> = {
-            onLeft: (err: StepError, ctx: StepCtx) => asTask(Either.left(err)),
-            onException: (err: unknown, ctx: StepCtx) => asTask(Either.right({...ctx, exceptionStepOutput: "exception"})),
-            onConflictingKeys: (keys: readonly string[] , ctx: StepCtx) => asTask(Either.right({...ctx, conflictingKeysStepOutput: "keys"})),
-        }
-
-        const result = await Pipeline(context, [step1, step2], options)
-
-        expect(result.isLeft()).toBe(true);
-        expect(result.unwrapLeft().errorMessage).toBe("step 1 error");
-        expect(step2Executed).toBe(false);
-    })
+const options = (overrides: Partial<PipelineOptions<Err, Ctx>> = {}): PipelineOptions<Err, Ctx> => ({
+    onException: () => left({ tag: "crash" }),
+    onConflictingKeys: () => left({ tag: "conflict" }),
+    ...overrides,
 });
 
-class StepError {
-    constructor(public errorMessage: string) { }
-}
+const start = (): Ctx => ({ input: "x" });
 
-class StepCtx {
-    public step1output?: string;
-    public step2output?: string;
-    public errorStepOutput?: string;
-    public conflictingKeysStepOutput?: string;
-    public exceptionStepOutput?: string;
+const setA: Step<Err, Ctx> = ctx => right({ ...ctx, a: `${ctx.input}1` });
+const setB: Step<Err, Ctx> = ctx => right({ ...ctx, b: `${ctx.a}2` });
 
-    constructor(public input: string) {
+describe("Pipeline", () => {
+    it("runs the steps in order and accumulates the context", async () => {
+        const result = await Pipeline(start(), [setA, setB], options());
 
-    }
-}
+        expect(result.unwrapRight()).toEqual({ input: "x", a: "x1", b: "x12" });
+    });
+
+    it("with no steps returns right of a copy of the initial context and calls no hook", async () => {
+        const ctx = start();
+        const hooks = {
+            onLeft: vi.fn(() => left<Err, Ctx>({ tag: "left" })),
+            onException: vi.fn(() => left<Err, Ctx>({ tag: "crash" })),
+            onConflictingKeys: vi.fn(() => left<Err, Ctx>({ tag: "conflict" })),
+        };
+
+        const result = await Pipeline(ctx, [], options(hooks));
+
+        expect(result.unwrapRight()).toEqual(ctx);
+        expect(result.unwrapRight()).not.toBe(ctx);
+        expect(hooks.onLeft).not.toHaveBeenCalled();
+        expect(hooks.onException).not.toHaveBeenCalled();
+        expect(hooks.onConflictingKeys).not.toHaveBeenCalled();
+    });
+
+    it("returns an EitherAsync that can be chained before awaiting", async () => {
+        const result = Pipeline(start(), [setA], options());
+
+        expect(result).toBeInstanceOf(EitherAsync);
+        expect(await Pipeline(start(), [setA], options()).map(c => c.a).match(v => v, () => "left")).toBe("x1");
+    });
+
+    it("accepts steps returning an Either, a Promise of an Either and an EitherAsync", async () => {
+        const sync: Step<Err, Ctx> = ctx => right({ ...ctx, a: "sync" });
+        const promised: Step<Err, Ctx> = async ctx => right({ ...ctx, b: "promise" });
+        const eitherAsync: Step<Err, Ctx> = ctx => EitherAsync.right({ ...ctx, fixed: "eitherAsync" });
+
+        const result = await Pipeline(start(), [sync, promised, eitherAsync], options());
+
+        expect(result.unwrapRight()).toEqual({ input: "x", a: "sync", b: "promise", fixed: "eitherAsync" });
+    });
+
+    it("without onLeft, a step's left is the result and later steps do not run", async () => {
+        const failing: Step<Err, Ctx> = () => left({ tag: "nope" });
+        const later = vi.fn(setB);
+
+        const result = await Pipeline(start(), [failing, later], options());
+
+        expect(result.unwrapLeft()).toEqual({ tag: "nope" });
+        expect(later).not.toHaveBeenCalled();
+    });
+
+    it("continues with the next step when onLeft returns right", async () => {
+        const failing: Step<Err, Ctx> = () => left({ tag: "no-avatar" });
+        const copyFixed: Step<Err, Ctx> = ctx => right({ ...ctx, b: ctx.fixed! });
+        const onLeft = vi.fn((_: Err, ctx: Readonly<Ctx>) => right<Err, Ctx>({ ...ctx, fixed: "default" }));
+
+        const result = await Pipeline(start(), [failing, copyFixed], options({ onLeft }));
+
+        expect(result.unwrapRight().b).toBe("default");
+        expect(onLeft).toHaveBeenCalledWith({ tag: "no-avatar" }, { input: "x" });
+    });
+
+    it("stops with onLeft's left", async () => {
+        const failing: Step<Err, Ctx> = () => left({ tag: "no-avatar" });
+        const later = vi.fn(setB);
+
+        const result = await Pipeline(start(), [failing, later], options({ onLeft: () => left({ tag: "mapped" }) }));
+
+        expect(result.unwrapLeft()).toEqual({ tag: "mapped" });
+        expect(later).not.toHaveBeenCalled();
+    });
+
+    it("calls onException with the thrown value and the context the step received, and continues on right", async () => {
+        const throwing: Step<Err, Ctx> = () => { throw new Error("boom"); };
+        const later = vi.fn(setB);
+        const onException = vi.fn((_: unknown, ctx: Readonly<Ctx>) => right<Err, Ctx>({ ...ctx, fixed: "recovered" }));
+
+        const result = await Pipeline(start(), [setA, throwing, later], options({ onException }));
+
+        const [exception, ctx] = onException.mock.calls[0]!;
+        expect((exception as Error).message).toBe("boom");
+        expect(ctx.a).toBe("x1");
+        expect(later).toHaveBeenCalled();
+        expect(result.unwrapRight()).toEqual({ input: "x", a: "x1", fixed: "recovered", b: "x12" });
+    });
+
+    it("treats a rejected step promise like a throw", async () => {
+        const rejecting: Step<Err, Ctx> = () => Promise.reject(new Error("rejected"));
+        const onException = vi.fn((_: unknown, ctx: Readonly<Ctx>) => right<Err, Ctx>({ ...ctx, fixed: "recovered" }));
+
+        const result = await Pipeline(start(), [rejecting], options({ onException }));
+
+        expect((onException.mock.calls[0]![0] as Error).message).toBe("rejected");
+        expect(result.unwrapRight().fixed).toBe("recovered");
+    });
+
+    it("stops with onException's left; later steps do not run", async () => {
+        const throwing: Step<Err, Ctx> = () => { throw new Error("boom"); };
+        const later = vi.fn(setB);
+
+        const result = await Pipeline(start(), [throwing, later], options());
+
+        expect(result.unwrapLeft()).toEqual({ tag: "crash" });
+        expect(later).not.toHaveBeenCalled();
+    });
+
+    it("calls onConflictingKeys with the keys, the received context and the returned context", async () => {
+        const one: Step<Err, Ctx> = ctx => right({ ...ctx, a: "1" });
+        const two: Step<Err, Ctx> = ctx => right({ ...ctx, a: "2" });
+        const onConflictingKeys = vi.fn(() => left<Err, Ctx>({ tag: "conflict" }));
+
+        await Pipeline(start(), [one, two], options({ onConflictingKeys }));
+
+        expect(onConflictingKeys).toHaveBeenCalledWith(["a"], { input: "x", a: "1" }, { input: "x", a: "2" });
+    });
+
+    it("accepts the step's output when onConflictingKeys returns right(next)", async () => {
+        const one: Step<Err, Ctx> = ctx => right({ ...ctx, a: "1" });
+        const two: Step<Err, Ctx> = ctx => right({ ...ctx, a: "2" });
+        const three = vi.fn(setB);
+
+        const result = await Pipeline(start(), [one, two, three],
+            options({ onConflictingKeys: (_keys, _ctx, next) => right(next) }));
+
+        expect(result.unwrapRight().a).toBe("2");
+        expect(three).toHaveBeenCalled();
+    });
+
+    it("stops with onConflictingKeys' left", async () => {
+        const one: Step<Err, Ctx> = ctx => right({ ...ctx, a: "1" });
+        const two: Step<Err, Ctx> = ctx => right({ ...ctx, a: "2" });
+        const three = vi.fn(setB);
+
+        const result = await Pipeline(start(), [one, two, three], options());
+
+        expect(result.unwrapLeft()).toEqual({ tag: "conflict" });
+        expect(three).not.toHaveBeenCalled();
+    });
+
+    it("reports a key the step dropped as a conflict", async () => {
+        const dropping: Step<Err, Ctx> = ctx => right({ input: ctx.input });
+        const onConflictingKeys = vi.fn(() => left<Err, Ctx>({ tag: "conflict" }));
+
+        const result = await Pipeline(start(), [setA, dropping], options({ onConflictingKeys }));
+
+        expect(result.unwrapLeft()).toEqual({ tag: "conflict" });
+        expect(onConflictingKeys).toHaveBeenCalledWith(["a"], { input: "x", a: "x1" }, { input: "x" });
+    });
+
+    it("reports a new object with equal content as a conflict", async () => {
+        const setU: Step<Err, Ctx> = ctx => right({ ...ctx, u: { id: 1 } });
+        const copyU: Step<Err, Ctx> = ctx => right({ ...ctx, u: { ...ctx.u! } });
+        const onConflictingKeys = vi.fn(() => left<Err, Ctx>({ tag: "conflict" }));
+
+        await Pipeline(start(), [setU, copyU], options({ onConflictingKeys }));
+
+        expect(onConflictingKeys).toHaveBeenCalledWith(["u"], expect.anything(), expect.anything());
+    });
+
+    it("accepts a step that returns the context it received unchanged", async () => {
+        const step: Step<Err, Ctx> = ctx => right(ctx);
+        const hooks = {
+            onLeft: vi.fn(() => left<Err, Ctx>({ tag: "left" })),
+            onException: vi.fn(() => left<Err, Ctx>({ tag: "crash" })),
+            onConflictingKeys: vi.fn(() => left<Err, Ctx>({ tag: "conflict" })),
+        };
+
+        const result = await Pipeline(start(), [setA, step], options(hooks));
+
+        expect(result.unwrapRight()).toEqual({ input: "x", a: "x1" });
+        expect(hooks.onLeft).not.toHaveBeenCalled();
+        expect(hooks.onException).not.toHaveBeenCalled();
+        expect(hooks.onConflictingKeys).not.toHaveBeenCalled();
+    });
+
+    it("does not freeze the caller's object but freezes the contexts handed to steps and the result", async () => {
+        const ctx = start();
+        const received: Array<Readonly<Ctx>> = [];
+        const spy = (step: Step<Err, Ctx>): Step<Err, Ctx> => current => {
+            received.push(current);
+            return step(current);
+        };
+
+        const result = await Pipeline(ctx, [spy(setA), spy(setB)], options());
+
+        expect(Object.isFrozen(ctx)).toBe(false);
+        expect(received).toHaveLength(2);
+        expect(received.every(Object.isFrozen)).toBe(true);
+        expect(Object.isFrozen(result.unwrapRight())).toBe(true);
+    });
+
+    it("does not conflict-check the context a hook returns", async () => {
+        const failing: Step<Err, Ctx> = () => left({ tag: "no-avatar" });
+        const onConflictingKeys = vi.fn(() => left<Err, Ctx>({ tag: "conflict" }));
+
+        const result = await Pipeline(start(), [setA, failing], options({
+            onLeft: (_, ctx) => right({ ...ctx, a: "changed" }),
+            onConflictingKeys,
+        }));
+
+        expect(onConflictingKeys).not.toHaveBeenCalled();
+        expect(result.unwrapRight().a).toBe("changed");
+    });
+
+    it("rejects when a hook throws", async () => {
+        const failing: Step<Err, Ctx> = () => left({ tag: "no-avatar" });
+
+        await expect(Promise.resolve(Pipeline(start(), [failing], options({
+            onLeft: () => { throw new Error("hook boom"); },
+        })))).rejects.toThrow("hook boom");
+    });
+
+    it("rejects when a hook returns a rejected promise", async () => {
+        const failing: Step<Err, Ctx> = () => left({ tag: "no-avatar" });
+
+        await expect(Promise.resolve(Pipeline(start(), [failing], options({
+            onLeft: () => Promise.reject(new Error("hook rejected")),
+        })))).rejects.toThrow("hook rejected");
+    });
+
+    it("runs 2000 steps without overflowing the stack", async () => {
+        type Counter = { count: number };
+        const increment: Step<Err, Counter> = ctx => right({ count: ctx.count + 1 });
+        const counterOptions: PipelineOptions<Err, Counter> = {
+            onException: () => left({ tag: "crash" }),
+            onConflictingKeys: (_keys, _ctx, next) => right(next),
+        };
+
+        const result = await Pipeline({ count: 0 }, Array.from({ length: 2000 }, () => increment), counterOptions);
+
+        expect(result.unwrapRight().count).toBe(2000);
+    });
+});
