@@ -1,6 +1,6 @@
 {
   "name": "@ngwes/groucho-fp",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Typed, functional pipelines for TypeScript: run steps over a shared context with recoverable failure hooks, and load steps from files at runtime. Built on @ngwes/mini-fp.",
   "repository": {
     "type": "git",

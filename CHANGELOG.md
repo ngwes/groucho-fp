@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/ngwes/groucho-fp/compare/v2.0.0...v2.0.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* license groucho-fp under apache-2.0 with a notice file ([#4](https://github.com/ngwes/groucho-fp/issues/4)) ([ee610eb](https://github.com/ngwes/groucho-fp/commit/ee610eb59408d2f8f928dfcdb1f52ae04dc72256))
+
 # [2.0.0](https://github.com/ngwes/groucho-fp/compare/v1.2.1...v2.0.0) (2026-11-01)
 
 
