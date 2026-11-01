@@ -16,14 +16,16 @@
     "pipeline",
     "steps"
   ],
-  "license": "ISC",
+  "license": "Apache-2.0",
   "author": "ngwes",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist/",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc",
