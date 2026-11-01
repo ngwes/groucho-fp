@@ -79,6 +79,19 @@ describe("loadSteps", () => {
         ]);
     });
 
+    it("keeps a module that throws null on import among the other errors", async () => {
+        const result = await loadSteps<string, StepCtx>([
+            fixture("broken/throws-null.ts"),
+            fixture("valid/missing.ts"),
+            fixture("valid/default-fn.ts"),
+        ]);
+
+        expect(result.unwrapLeft()).toEqual([
+            { tag: "import-failed", path: fixture("broken/throws-null.ts"), cause: null },
+            expect.objectContaining({ tag: "not-found", path: fixture("valid/missing.ts") }),
+        ]);
+    });
+
     it("resolves relative paths against the working directory and reports them absolute", async () => {
         const missing = fixture("valid/missing.ts");
 
@@ -130,6 +143,6 @@ describe("loadStepsFromDir", () => {
         const result = await loadStepsFromDir<string, StepCtx>(fixture("invalid"));
 
         const errors = result.unwrapLeft();
-        expect(errors.map(error => error.tag)).toEqual(["invalid-export", "invalid-export", "invalid-export"]);
+        expect(errors.map(error => error.tag)).toEqual(["invalid-export", "invalid-export", "invalid-export", "invalid-export"]);
     });
 });

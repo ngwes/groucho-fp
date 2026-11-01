@@ -37,4 +37,32 @@ describe("importModule", () => {
         expect(error).toMatchObject({ tag: "import-failed", path });
         expect((error as { cause: Error }).cause.message).toBe("boom on import");
     });
+
+    it("reports a module that throws null on import as import-failed, with a null cause", async () => {
+        const path = fixture("broken/throws-null.ts");
+
+        const error = (await importModule(path)).unwrapLeft();
+
+        expect(error).toEqual({ tag: "import-failed", path, cause: null });
+    });
+
+    it("reports an existing file that imports a missing dependency as import-failed", async () => {
+        const path = fixture("broken/missing-dependency.mjs");
+
+        const error = (await importModule(path)).unwrapLeft();
+
+        expect(error).toMatchObject({ tag: "import-failed", path });
+    });
+
+    it("reports a module whose exports are null as invalid-export", async () => {
+        const path = fixture("invalid/exports-null.cjs");
+
+        const error = (await importModule(path)).unwrapLeft();
+
+        expect(error).toEqual({
+            tag: "invalid-export",
+            path,
+            detail: "no steps or default export: the module exports null",
+        });
+    });
 });
