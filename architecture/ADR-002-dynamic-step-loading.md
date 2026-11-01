@@ -1,6 +1,6 @@
 # ADR-002: Runtime Dynamic Step Loading
 
-**Status:** Accepted  
+**Status:** Accepted — superseded in part by [ADR-003](ADR-003-mini-fp-2-and-hook-recovery.md)  
 **Date:** 2026-04-04  
 **Author:** ngwes
 
