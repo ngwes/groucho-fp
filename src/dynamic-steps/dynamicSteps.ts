@@ -1,58 +1,60 @@
-import { type Step } from "../pipeline/types.js"
-import { join, resolve } from "node:path";
+import { EitherAsync, TryAsync, Validate, foldAsync, left, right, sequenceValidate } from "@ngwes/mini-fp";
 import { readdir } from "node:fs/promises";
-import { createJiti } from "jiti"
-import { constants } from "./dynamic-steps-constants.js"
+import { join, resolve } from "node:path";
+import { type Step } from "../pipeline/types.js";
+import { constants } from "./dynamic-steps-constants.js";
+import { importModule } from "./importModule.js";
+import { type LoadError } from "./LoadError.js";
+import { stepsOf } from "./stepsOf.js";
 
-const jiti = createJiti(import.meta.url);
+export type DynamicStepModule<E, Ctx> =
+    | { default: Step<E, Ctx> }
+    | { default: ReadonlyArray<Step<E, Ctx>> }
+    | { steps: ReadonlyArray<Step<E, Ctx>> };
 
-export type DynamicStepModule<L, Ctx> =
-    | { default: Step<L, Ctx> }
-    | { default: ReadonlyArray<Step<L, Ctx>> }
-    | { steps: ReadonlyArray<Step<L, Ctx>> };
+const loadFile = <E, Ctx>(path: string): Promise<Validate<LoadError, Step<E, Ctx>[]>> =>
+    importModule(path)
+        .bind(module => stepsOf<E, Ctx>(path, module))
+        .match(
+            steps => Validate.valid<LoadError, Step<E, Ctx>[]>(steps),
+            error => Validate.invalid<LoadError, Step<E, Ctx>[]>([error]),
+        );
 
+/**
+ * Loads the steps exported by each file, in path order. Relative paths resolve against the working directory.
+ * Every file is attempted: if any fail, the result is left with all the failures, in path order.
+ */
+export const loadSteps = <E, Ctx>(
+    paths: ReadonlyArray<string>,
+): EitherAsync<ReadonlyArray<LoadError>, ReadonlyArray<Step<E, Ctx>>> =>
+    EitherAsync.from(
+        foldAsync(
+            paths.map(path => resolve(path)),
+            [] as Validate<LoadError, Step<E, Ctx>[]>[],
+            async (loaded, path) => [...loaded, await loadFile<E, Ctx>(path)],
+        ).then(loaded => sequenceValidate(loaded).match(
+            stepLists => right<ReadonlyArray<LoadError>, ReadonlyArray<Step<E, Ctx>>>(stepLists.flat()),
+            errors => left<ReadonlyArray<LoadError>, ReadonlyArray<Step<E, Ctx>>>(errors),
+        )),
+    );
 
-export const loadSteps = async <L, Ctx>(paths: string[]): Promise<ReadonlyArray<Step<L, Ctx>>> => {
+/**
+ * Loads the steps from the files of a directory, ordered by name. Only files matching `pattern` are loaded;
+ * by default, .ts/.js/.mjs/.cjs files other than declaration (.d.ts), test (.test.*) and spec (.spec.*) files.
+ */
+export const loadStepsFromDir = <E, Ctx>(
+    dir: string,
+    options?: { pattern?: RegExp },
+): EitherAsync<ReadonlyArray<LoadError>, ReadonlyArray<Step<E, Ctx>>> => {
+    const pattern = options?.pattern ?? constants.filePatterns;
+    const absolute = resolve(dir);
 
-    let steps: Step<L, Ctx>[] = [];
-
-    for (const path of paths) {
-        steps = steps.concat(await importSteps<L, Ctx>(path));
-    }
-
-    return steps;
+    return TryAsync.runAsync(() => readdir(absolute, { withFileTypes: true })).toEither()
+        .mapLeft<ReadonlyArray<LoadError>>(cause => [{ tag: "not-found", path: absolute, cause }])
+        .map(entries => entries
+            .filter(entry => entry.isFile() && pattern.test(entry.name))
+            .map(entry => entry.name)
+            .sort((a, b) => a.localeCompare(b))
+            .map(name => join(absolute, name)))
+        .bindAsync(loadSteps<E, Ctx>);
 };
-
-export const loadStepsFromDir = async <L, Ctx>(
-    path: string,
-    options?: { pattern?: RegExp }): Promise<ReadonlyArray<Step<L, Ctx>>> => {
-    const fileNamePatterns = options?.pattern ?? constants.filePatterns;
-    const absolutePath = resolve(path);
-
-    const entries = await readdir(absolutePath, { withFileTypes: true });
-
-    const paths = entries
-        .filter(f => f.isFile() && fileNamePatterns.test(f.name))
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(e => join(absolutePath, e.name))
-
-    return await loadSteps(paths);
-}
-
-
-async function importSteps<L, Ctx>(path: string): Promise<Step<L, Ctx>[]> {
-    let steps: Step<L, Ctx>[] = [];
-
-    const readStep = await jiti.import(resolve(path)) as Record<string, unknown>;
-
-    const imported = readStep.steps ?? readStep.default;
-
-    if (typeof imported === constants.functionKey)
-        steps.push(imported as Step<L, Ctx>);
-    else {
-        if (Array.isArray(imported))
-            steps.push(...imported as Step<L, Ctx>[]);
-    }
-
-    return steps;
-}
