@@ -530,3 +530,11 @@ The package exports `Pipeline`, `loadSteps` and `loadStepsFromDir`, and the type
 
 - Node.js >= 18
 - `@ngwes/mini-fp` 2.x (`^2.0.0`, peer dependency)
+
+## License
+
+[Apache License 2.0](https://github.com/ngwes/groucho-fp/blob/main/LICENSE). Copyright 2026 ngwes.
+
+You may use, modify and redistribute groucho-fp for any purpose, commercial included. If you redistribute it, or a work that contains it or is derived from it, you must keep the attribution in its [NOTICE](https://github.com/ngwes/groucho-fp/blob/main/NOTICE) file: in a NOTICE file of your own, in your documentation, or wherever your product shows third-party notices, as section 4 of the license requires.
+
+To use groucho-fp without that attribution, ask ngwes for a separate license by opening an issue at https://github.com/ngwes/groucho-fp/issues.
