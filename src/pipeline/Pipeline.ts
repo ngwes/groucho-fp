@@ -26,8 +26,10 @@ const runStep = <E, Ctx extends object>(
     options: PipelineOptions<E, Ctx>,
 ): EitherAsync<E, Readonly<Ctx>> =>
     EitherAsync.from(
-        // Only the step runs inside the TryAsync: a throwing or rejecting hook rejects the pipeline.
-        TryAsync.runAsync(async () => step(current)).toEither().matchAsync(
+        // Only the step runs inside the TryAsync: `match` calls the hooks after it, so a throwing or
+        // rejecting hook rejects the pipeline. The exception goes to onException as is, never into a
+        // left: a step may throw undefined, which a left cannot hold.
+        TryAsync.runAsync(async () => step(current)).match(
             outcome => outcome.match<StepResult<E, Ctx>>(
                 next => conflictingKeys(current, next).match(
                     keys => options.onConflictingKeys(keys, current, next),

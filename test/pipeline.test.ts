@@ -113,6 +113,26 @@ describe("Pipeline", () => {
         expect(result.unwrapRight().fixed).toBe("recovered");
     });
 
+    it("calls onException with undefined for a step that throws undefined, and can recover", async () => {
+        const throwing: Step<Err, Ctx> = () => { throw undefined; };
+        const onException = vi.fn((_: unknown, ctx: Readonly<Ctx>) => right<Err, Ctx>({ ...ctx, fixed: "recovered" }));
+
+        const result = await Pipeline(start(), [throwing, setA], options({ onException }));
+
+        expect(onException).toHaveBeenCalledWith(undefined, { input: "x" });
+        expect(result.unwrapRight()).toEqual({ input: "x", fixed: "recovered", a: "x1" });
+    });
+
+    it("calls onException with undefined for a step that rejects with no reason, and can recover", async () => {
+        const rejecting: Step<Err, Ctx> = () => Promise.reject();
+        const onException = vi.fn((_: unknown, ctx: Readonly<Ctx>) => right<Err, Ctx>({ ...ctx, fixed: "recovered" }));
+
+        const result = await Pipeline(start(), [rejecting, setA], options({ onException }));
+
+        expect(onException).toHaveBeenCalledWith(undefined, { input: "x" });
+        expect(result.unwrapRight()).toEqual({ input: "x", fixed: "recovered", a: "x1" });
+    });
+
     it("stops with onException's left; later steps do not run", async () => {
         const throwing: Step<Err, Ctx> = () => { throw new Error("boom"); };
         const later = vi.fn(setB);
@@ -235,6 +255,27 @@ describe("Pipeline", () => {
         await expect(Promise.resolve(Pipeline(start(), [failing], options({
             onLeft: () => Promise.reject(new Error("hook rejected")),
         })))).rejects.toThrow("hook rejected");
+    });
+
+    it("rejects when onException throws, without calling it again", async () => {
+        const throwing: Step<Err, Ctx> = () => { throw new Error("step boom"); };
+        const onException = vi.fn((): never => { throw new Error("onException boom"); });
+
+        await expect(Promise.resolve(Pipeline(start(), [throwing], options({ onException }))))
+            .rejects.toThrow("onException boom");
+        expect(onException).toHaveBeenCalledTimes(1);
+    });
+
+    it("freezes the context a hook returns before the next step receives it", async () => {
+        const failing: Step<Err, Ctx> = () => left({ tag: "no-avatar" });
+        const received: Array<Readonly<Ctx>> = [];
+        const spy: Step<Err, Ctx> = ctx => { received.push(ctx); return right(ctx); };
+
+        await Pipeline(start(), [failing, spy], options({ onLeft: (_, ctx) => right({ ...ctx, fixed: "default" }) }));
+
+        expect(received).toHaveLength(1);
+        expect(received[0]).toEqual({ input: "x", fixed: "default" });
+        expect(Object.isFrozen(received[0])).toBe(true);
     });
 
     it("runs 2000 steps without overflowing the stack", async () => {
