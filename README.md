@@ -531,6 +531,10 @@ The package exports `Pipeline`, `loadSteps` and `loadStepsFromDir`, and the type
 - Node.js >= 18
 - `@ngwes/mini-fp` 2.x (`^2.0.0`, peer dependency)
 
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/ngwes/groucho-fp/blob/main/CONTRIBUTING.md): how to report a problem, propose a change and open a pull request.
+
 ## License
 
 [Apache License 2.0](https://github.com/ngwes/groucho-fp/blob/main/LICENSE). Copyright 2026 ngwes.
